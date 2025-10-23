@@ -1,0 +1,1393 @@
+<!--
+openweathermap.org - weather
+
+Thunderstorm
+Drizzle
+Rain
+Snow
+Atmosphere:[Mist, Smoke, Haze, Dust, Fog, Sand, Dust, Ash, Squall, Tornado]
+Clear
+Clouds
+
+=>
+clear,clouds,rain,snow,else
+
+-->
+
+<!DOCTYPE html>
+<meta charset="UTF-8">
+
+<body>
+
+<input type="file" id="folderInput" webkitdirectory directory>
+
+<br>
+<p id="folderLoad"></p>
+
+<p id="clock"></p>
+
+
+<p id="nowPlaying" style="font-weight:bold;"></p>
+
+<label>音量: <input type="range" id="volumeBar" min="0" max="50" value="10" disabled="true"></label>
+
+<label for="muteCheckBox">ミュートする</label>
+
+<input type="checkbox" id="muteCheckBox" disabled="true">
+
+<label for="antiPause">Anti Pause</label>
+
+<input type="checkbox" id="antiPause" disabled="true" checked>
+
+<p id="volumeB"></p>
+<p id="volumeM"></p>
+
+<label for="modeSelect" >モードを選ぶ</label>
+<select id="modeSelect" name="mode" disabled="true">
+    <option value="-1">選択してください</option>
+    <option value="0">🌐︎ Scene Select</option>
+    <option value="1">通常</option>
+    <option value="2">ランダムを繰り返し</option>
+    <option value="3">Lo-fi</option>
+    </option>
+</select>
+
+<audio id="audioPlayerM" controls style="display:none;"></audio>
+<video id="videoPlayerM" controls width="480" style="display:none;"></video>
+
+<audio id="audioPlayerB" controls style="display:none;"></audio>
+<video id="videoPlayerB" controls width="480" style="display:none;"></video>
+
+<audio id="audioPlayerJ" controls style="display: none;"></audio>
+<video id="videoPlayerJ" controls style="display: none;"></video>
+
+<audio id="audioPlayerT" controls volume="0" style="display: none;"></audio>
+<video id="videoPlayerT" controls volume="0" width="480" style="display: none;"></video>
+
+<br>
+
+<p class="weather" id="speed" style="display: none;">速度: 取得中...</p>
+
+<img id="weatherPng">
+
+<p class="weather" id="lat">緯度:</p>
+<p class="weather" id="lon">経度:</p>
+<p class="weather" id="weather">天気:</p><!--　天気:Clouds - overcast clouds　-->
+<p class="weather" id="temp">℃（体感:℃）</p>
+<p class="weather" id="pressure">hPa（地上:hPa,海抜:hPa）</p>
+<p class="weather" id="visibility">可視:m</P>
+<p class="weather" id="wind">風速:（最大瞬間風速:）</p>
+<p class="weather" id="clouds">雲量:%</p>
+<p class="weather" id="rain">降雨量:mm</p>
+<p class="weather" id="snow">降雪量:mm</p>
+<p class="weather" id="country">国: 都市:</p>
+<p class="weather" id="sunrise">日の出:</p>
+<p class="weather" id="sunset">日の入り:</p>
+<p class="weather" id="time">取得時刻:</p>
+
+<input class="weather" type="number" id="intervalInput" value="1000" min="100">
+<button class="weather" id="applyInterval">更新</button>
+
+</body>
+
+<script>
+    const folderInput = document.getElementById("folderInput")//フォルダの入力欄
+    const folderLoad = document.getElementById("folderLoad")//フォルダの読み込みの進捗状況
+    const clock = document.getElementById("clock")//時刻表示
+    const nowPlaying = document.getElementById("nowPlaying")//現在再生している曲名
+    const volumeBar = document.getElementById("volumeBar")//音量バー
+    const muteCheckbox = document.getElementById("muteCheckBox")//ミュートするかどうかのボタン
+    const volumeB_Element = document.getElementById("volumeB")//audio/videoBの音量を表示する
+    const volumeM_Element = document.getElementById("volumeM")//audio/videoMの音量を表示する
+    const modeSelect = document.getElementById("modeSelect")//モードを選ぶボタン
+    const antiPause = document.getElementById("antiPause")//Anti Pauseモード
+    const audioM = document.getElementById("audioPlayerM")//audioM-element
+    const videoM = document.getElementById("videoPlayerM")//videoM-element
+    const audioB = document.getElementById("audioPlayerB")//audioB-element
+    const videoB = document.getElementById("videoPlayerB")//videoB-element
+    const audioT = document.getElementById("audioPlayerT")//audioT-element
+    const videoT = document.getElementById("videoPlayerT")//videoT-element
+    const audioJ = document.getElementById("audioPlayerJ")
+    const videoJ = document.getElementById("videoPlayerJ")
+
+    const speed = document.getElementById("speed")
+    const intervalInput = document.getElementById("intervalInput")
+
+    const weatherPng = document.getElementById("weatherPng")
+    const latE = document.getElementById("lat")
+    const lonE = document.getElementById("lon")
+    const weatherE = document.getElementById("weather")
+    const tempE = document.getElementById("temp")
+    const pressureE = document.getElementById("pressure")
+    const visibilityE = document.getElementById("visibility")
+    const windE = document.getElementById("wind")
+    const cloudsE = document.getElementById("clouds")
+    const rainE = document.getElementById("rain")
+    const snowE = document.getElementById("snow")
+    const countryE = document.getElementById("country")
+    const sunriseE = document.getElementById("sunrise")
+    const sunsetE = document.getElementById("sunset")
+    const timeE = document.getElementById("time")
+
+    let weather = ""
+    let lastWeather = ""
+
+    let lastLat = null
+    let lastLon = null
+    let lastTime = null
+
+    let currentTimes = []
+
+    // 天気の取得の許可による要素の表示
+    function weatherElementManage(bool) {
+        const weathers = document.querySelectorAll(".weather")
+        if (bool) {
+            weathers.forEach(p => p.style.display = "block")
+        } else {
+            weathers.forEach(p => p.style.display = "none")
+        }
+    }
+
+    // 速度を取得
+    function toRad(deg) {
+        return deg * Math.PI / 180
+    }
+
+    function calcDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371000; // 地球半径[m]
+        const φ1 = toRad(lat1);
+        const φ2 = toRad(lat2);
+        const Δφ = toRad(lat2 - lat1);
+        const Δλ = toRad(lon2 - lon1);
+
+        const a = Math.sin(Δφ / 2) ** 2 +
+                  Math.cos(φ1) * Math.cos(φ2) *
+                  Math.sin(Δλ / 2) ** 2;
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c;
+    }
+
+    function trackSpeed() {
+        navigator.geolocation.getCurrentPosition(position => {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            const now = Date.now();
+
+            if (lastLat !== null && lastLon !== null && lastTime !== null) {
+                const distance = calcDistance(lastLat, lastLon, lat, lon); // m
+                const timeDiff = (now - lastTime) / 1000; // 秒
+                const speed = distance / timeDiff; // m/s
+                const kmh = (speed * 3.6).toFixed(2); // km/h
+
+                document.getElementById("speed").innerText = `速度: ${kmh} km/h`;
+                console.log(`Speed: ${kmh} km/h`);
+            }
+
+            lastLat = lat;
+            lastLon = lon;
+            lastTime = now;
+        });
+
+        
+        let intervalId = null;
+        let interval = 1000; // デフォルト1000ms
+
+        function startTracking() {
+            // 既存のタイマーがあれば停止
+            if (intervalId) clearInterval(intervalId);
+            // 新しい間隔で実行
+            intervalId = setInterval(trackSpeed, interval);
+            console.log(`速度取得を${interval}msごとに実行中`);
+        }
+
+        // --- 入力値を反映して周期を変更 ---
+        document.getElementById("applyInterval").addEventListener("click", () => {
+            const val = parseInt(document.getElementById("intervalInput").value);
+            if (!isNaN(val) && val > 0) {
+                interval = val;
+                startTracking();
+                alert("更新しました")
+                document.getElementById("speed").innerText = `更新間隔を ${interval}ms に設定しました`;
+            } else {
+                alert("正しいミリ秒値を入力してください");
+            }
+        });
+
+        // ページ読み込み時に追跡を開始
+        startTracking();
+    }
+
+    // UNIX時間をミリ秒に変換
+    function convertUnixToJST(unixTime) {
+        // UNIX時間（秒）をミリ秒に変換
+        const date = new Date(unixTime * 1000);
+
+        // 各要素を取得（日本時間に自動調整される）
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0'); // 月は0始まり
+        const day = String(date.getDate()).padStart(2, '0');
+        const hour = String(date.getHours()).padStart(2, '0');
+        const minute = String(date.getMinutes()).padStart(2, '0');
+        const second = String(date.getSeconds()).padStart(2, '0');
+
+        // 整形して返す
+        return `${year}/${month}/${day} ${hour}:${minute}:${second}`;
+    }
+
+    // APIから天気を取得して更新
+    function getWeather() {
+
+        let lat = null
+        let lon = null
+        let weather = null
+        let weatherDescription = null
+        let weatherIcon = null
+        let temp = null//セルシウス度
+        let feelTemp = null
+        let pressure = null
+        let humidity = null
+        let seaPressure = null//海抜での気圧
+        let groundPressure = null//地上での気圧
+        let visibility = null
+        let windSpeed = null
+        let windDirection = null
+        let windGust = null//最大瞬間風速
+        let clouds = null
+        let rain = null
+        let snow = null
+        let country = null
+        let sunrise = null
+        let sunset = null
+        let time = null
+        let name = null//都市名
+
+        
+
+        const apiKey = "920721bba8b527f15319c1e2ade3f054"; // ← ここに自分のAPIキーを入れる
+
+        navigator.geolocation.getCurrentPosition(success, error);
+
+        function success(position) {
+
+            console.log("success")
+
+            lat = position.coords.latitude;
+            lon = position.coords.longitude;
+
+            // OpenWeatherMapのAPIエンドポイント
+            const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&lang=en&units=metric`;
+
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        alert(`HTTP Error:${response.status}`)
+                    }
+
+                    return response.json()
+                })
+                .then(data => {
+                    console.log("weatherApi - data")
+                    console.log(data);
+
+                    lon = data.coord.lon
+                    lat = data.coord.lat
+
+                    weather = data.weather[0].main
+                    weatherDescription = data.weather[0].description
+                    weatherIcon = data.weather[0].icon
+
+                    temp = data.main.temp
+                    feelTemp = data.main.feels_like
+                    pressure = data.main.pressure
+                    humidity = data.main.humidity
+                    seaPressure = data.main.sea_level
+                    groundPressure = data.main.grnd_level
+
+                    visibility = data.visibility
+
+                    windSpeed = data.wind.speed
+                    windDirection = data.wind.deg
+                    windGust = data.wind.gust
+
+                    clouds = data.clouds.all
+
+                    time = data.dt
+
+                    country = data.sys.country
+                    sunrise = data.sys.sunrise
+                    sunset = data.sys.sunset
+
+                    name = data.name
+
+                    rain = data.rain?.["1h"] ?? 0
+
+                    snow = data.snow?.["1h"] ?? 0
+
+
+
+                    weatherPng.src = `https://openweathermap.org/img/wn/${weatherIcon}@2x.png`
+
+                    latE.innerText = `緯度:${lat}°`
+                    lonE.innerText = `経度:${lon}°`
+
+                    weatherE.innerText = `天気:${weather} - ${weatherDescription}`
+
+                    tempE.innerText = `${temp}℃（体感:${feelTemp}℃）`
+                    pressureE.innerText = `${pressure}hPa（地上:${groundPressure}hPa,海抜:${seaPressure}hPa）`
+                    visibilityE.innerText = `可視:${visibility}m`
+
+                    windE.innerText = `風速:${windSpeed}m/s（最大瞬間風速:${windGust}m/s,方角:${windDirection}）`
+
+                    cloudsE.innerText = `雲量:${clouds}%`
+
+                    rainE.innerText = `降雨量:${rain}mm`
+                    snowE.innerText = `降雪量:${snow}mm`
+
+                    countryE.innerText = `国:${country} 都市:${name}`
+
+                    sunriseE.innerText = `日の出:${convertUnixToJST(sunrise)}`
+                    sunsetE.innerText = `日の入り:${convertUnixToJST(sunset)}`
+
+                    timeE.innerText = `取得時刻:${convertUnixToJST(time)}`
+                    
+
+                })
+                .catch(err => {
+                    alert("天気を取得できません")
+                    console.error(err);
+                });
+
+                weatherElementManage(true)
+        }
+
+        function error() {
+
+            console.log("error")
+
+            alert("位置情報を取得できません")
+
+            weatherElementManage(false)
+        }
+    }
+    // 時計を更新
+    function updateClock() {
+        let time = new Date()
+        let days = ["日","月","火","水","木","金","土"]
+        let year = time.getFullYear()
+        let month = time.getMonth()+1
+        let date = time.getDate()
+        let day = days[time.getDay()]
+        let hour = time.getHours()
+        let minute = time.getMinutes()
+        let second = time.getSeconds()
+        let mSecond = time.getMilliseconds()
+        clock.innerHTML = `${year}年 ${month}月 ${date}日（${day}） ${hour}:${minute}:${second}:${mSecond}`
+    }
+
+    document.addEventListener("DOMContentLoaded",function() {//読み込みが完了したとき
+
+        getWeather()
+        
+        lastWeather = weather
+
+        setInterval(() => {updateClock()},1000)
+
+        
+        setInterval(() => {
+            trackSpeed()
+        }, 1000);
+        
+        
+    })
+
+
+
+folderInput.addEventListener("input",async function() {
+
+    files = event.target.files
+
+    folderInput.disabled = true
+
+    folderLoad.innerText = "読み込み中"
+
+    let antiPauseBool = true
+
+    let play = undefined
+
+    let a_List = []
+    let b_List = []
+    let c_List = []
+    let d_List = []
+    let e_List = []
+    let f_List = []
+    let g_List = []
+    let h_List = []
+
+    let allList = []
+
+    let clearList = []
+    let rainList = []
+    let snowList = []
+    let cloudsList = []
+    let otherWeathersList = []
+
+    function openDB() {
+        return new Promise((resolve, reject) => {
+        const request = indexedDB.open("FileHashDB", 2);/*名前、バージョンを指定してDBに接続*/
+        request.onupgradeneeded = function(event) {/*接続したときの初期化等の処理*/
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains("hashes")) {/*オブジェクトストアにhashesの名前が含まれないとき*/
+                db.createObjectStore("hashes", { keyPath: "path" });/*ハッシュ、keyPath*/
+            }
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+        });
+    }
+
+    async function saveHash(db, path, hash, played, lastmodified) {
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction("hashes", "readwrite");
+            const store = tx.objectStore("hashes");
+            store.put({ path, hash, played, lastmodified });
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    async function getHash(db, path, lastmodified) {
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction("hashes", "readonly");
+            const store = tx.objectStore("hashes");
+            const request = store.get(path);
+            request.onsuccess = () => {
+                const record = request.result;
+                if (record && record.lastmodified === lastmodified) {
+                    resolve({
+                        hash: record.hash,
+                        played: record.played ?? 0
+                    }); // キャッシュが有効
+                } else {
+                    resolve(null); // キャッシュなし or 更新されている
+                }
+            };
+
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    function bufferToHex(buffer) {
+        return [...new Uint8Array(buffer)]
+        .map(b => b.toString(16).padStart(2,"0"))
+        .join("")
+    }
+
+    async function getFileHash(file) {
+        const arrayBuffer = await file.arrayBuffer();
+        const hashBuffer = await crypto.subtle.digest("SHA-256", arrayBuffer);
+        return bufferToHex(hashBuffer);
+    }
+
+    function getHashFromPath(path) {
+        for (const data of files) {
+            if (data[0] === path) {
+                return data[1]
+            }
+        }
+        console.log("getHashFromPath:not found")
+        return null
+    }
+
+    function getFileFromPath(path) {
+        for (const file of files) {
+            if (file.webkitRelativePath === path) {
+                return file
+            }
+        }
+        console.log("getFileFromPath:not found")
+        return null
+    }
+
+    function getPathFromHash(hash) {
+            for (const data of allList) {
+                if (data.hash === hash) {
+                    return data.path
+                }
+            }
+            console.log("getPathFromHash:not found")
+            return null
+    }
+
+    async function updateMusicPlayed(hash) {
+        const db = await openDB()
+        const tx = db.transaction("hashes","readwrite")
+        const store = tx.objectStore("hashes",{keyPath: "hash"})
+        const data = await new Promise((resolve,reject) => {
+            const request = store.get(hash)
+            request.onsuccess = () => resolve(request.result)
+            request.onerror = () => reject(request.error)
+        })
+
+        if (!data) {
+            console.log(`updateMusicPlayed: ${hash} not found`)
+            return
+        }
+
+        data.played = (data.played || 0) + 1
+
+        if(data.file) delete data.file
+
+        await store.put(data)
+
+        console.log(`${data.path} played ${data.played}times`)
+    }
+
+    class Music {
+        constructor(path,hash,file,played) {
+            this.path = path
+            this.hash = hash
+            this.file = file
+            this.times = ["a","b","c","d","e","f","g","h"]//この時間の時に音楽を再生
+            this.weathers = ""//この天気の時に音楽を再生
+            this.played = played
+        }
+
+        setTimes(list) {
+            if (typeof(list) === "string"){
+                if (list === "day"){
+                    this.times = ["c","d","e","f"]
+                }else if(list === "night") {
+                    this.times = ["a","b","g","h"]
+                }else if(list === "midnight") {
+                    this.times = ["a,h"]
+                }else if(list === "am") {
+                    this.times = ["a","b","c","d"]
+                }else if(list === "pm") {
+                    this.times = ["e","f","g","h"]
+                }else if(list === "all") {
+                    this.times = ["a","b","c","d","e","f","g","h"]
+                }else if(list === "notmidnight") {
+                    this.times = ["b","c","d","e","f","g"]
+                }
+                
+                else{
+                    console.log("Music.set() - Error")
+                }
+            }else {
+                this.times = list
+            }
+
+            if (this.times.includes("a")) {
+                a_List.push(this)
+            } 
+            if(this.times.includes("b")){
+                b_List.push(this)
+            } 
+            if(this.times.includes("c")){
+                c_List.push(this)
+            } 
+            if(this.times.includes("d")){
+                d_List.push(this)
+            }
+            if(this.times.includes("e")){
+                e_List.push(this)
+            }
+            if(this.times.includes("f")){
+                f_List.push(this)
+            }
+            if(this.times.includes("g")){
+                g_List.push(this)
+            }
+            if(this.times.includes("h")){
+                h_List.push(this)
+            }
+        }
+
+        setCurrentTime(time) {
+            let hour = time.slice(0,2)
+            let minute = time.slice(2,4)
+
+            const now = new Date()
+            const targetTime = new Date()
+            targetTime.setHours(hour-0);
+            targetTime.setMinutes(minute-0);
+            targetTime.setSeconds(1);
+            targetTime.setMilliseconds(0);
+
+            let delay = targetTime.getTime() - now.getTime();
+
+            if (delay < 0) {
+                targetTime.setDate(targetTime.getDate()+1)
+                delay = targetTime.getTime() - now.getTime()
+            }
+
+            currentTimes.push(targetTime)
+
+            setTimeout(play,delay,"j",this.hash)
+
+        }
+
+        setWeathers(weather) {
+            this.weathers = weather
+            if (weather === "Rain") {
+                rainList.push(this)
+            } else if (weather === "Snow") {
+                snowList.push(this)
+            } else if (weather === "Clear") {
+                clearList.push(this)
+            } else if (weather === "Clouds") {
+                cloudsList.push(this)
+            } else {
+                otherWeathersList.push(this)
+            }
+        }
+    }
+
+    function getDuration(file) {
+        return new Promise((resolve,reject) => {            
+            const url = URL.createObjectURL(file)
+            const lowerName = file.name.toLowerCase()            
+            audioT.style.display = "none"
+            videoT.style.display = "none"            
+            audioT.pause()
+            videoT.pause()            
+            if (lowerName.endsWith('.mp3') || lowerName.endsWith('.m4a')) {
+                audioT.src = url;
+                audioT.addEventListener("loadedmetadata",() => {
+                    resolve(audioT.duration)
+                    URL.revokeObjectURL(url)
+                })
+            } else if (lowerName.endsWith('.webm') || lowerName.endsWith('.mkv') || lowerName.endsWith(".mp4")) {
+                videoT.src = url;
+                videoT.addEventListener("loadedmetadata",() => {
+                    resolve(videoT.duration)
+                    URL.revokeObjectURL(url)
+            })            
+            }else {
+                reject ("unsupported file")
+            }
+        })
+    }
+
+    function addTimeByHash(list,hash) {
+
+        
+        for (const data of allList) {
+            if (data.hash === hash) {
+                data.setTimes(list)
+                console.log(`time:set ${getPathFromHash(hash)} for ${list}`)
+                return null
+            }
+        }
+        console.log(`time:${hash} doesn't exist`)
+        return null
+    }
+
+    function addSignalByHash(str,hash) {
+        for (const data of allList) {
+            if (data.hash === hash) {
+                data.setCurrentTime(str)
+                console.log(`signal:set ${getPathFromHash(hash)} for ${str}`)
+                return null
+            }
+        }
+    }
+
+    function addWeatherByHash(str,hash) {
+        for (const data of allList) {
+            if (data.hash === hash) {
+                data.setWeathers(str)
+                console.log(`weather:set ${getPathFromHash(hash)}`)
+                return null
+            }
+        }
+    }
+
+    async function loadFiles() {
+
+        const db = await openDB();
+
+        folderLoad.innerText =`読み込み中(0/${files.length})`
+
+        let loaded = 0
+
+        const cachePromises = [];
+        for (const file of files) {
+            cachePromises.push(getHash(db, file.webkitRelativePath, file.lastmodified));
+        }
+
+        // すべての getHash 結果を同時に待つ
+        const cacheResults = await Promise.all(cachePromises);
+
+        const missingFiles = [];
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const result = cacheResults[i];
+
+            if (result && result.hash) {
+                // キャッシュ命中 → すぐ Music インスタンス生成
+                allList.push(new Music(file.webkitRelativePath, result.hash, file, result.played));
+            } else {
+                // キャッシュなし → 後でハッシュ計算
+                missingFiles.push(file);
+            }
+        }
+
+        // --- キャッシュがなかったファイルを一括処理 ---
+        loaded = allList.length;
+
+        folderLoad.innerText = `読み込み中(${loaded}/${files.length})`;
+
+        for (const file of missingFiles) {
+            const hash = await getFileHash(file);
+            await saveHash(db, file.webkitRelativePath, hash, 0, file.lastmodified);
+            allList.push(new Music(file.webkitRelativePath, hash, file, 0));
+
+            loaded++;
+            folderLoad.innerText = `読み込み中(${loaded}/${files.length})`;
+        }
+
+        /*
+        for (data of files) {
+
+            path = data.webkitRelativePath
+            const parts = path.split("/")
+
+            let hash = await getHash(db, path, data.lastmodified)
+
+            if (!hash) {
+                hash = await getFileHash(file)
+                await saveHash(db,path,hash,0,file.lastmodified)
+
+                //saveHash(db, path, hash, played, lastmodified)
+            }
+
+            allList.push(new Music(path,hash,data))
+            loaded += 1
+            folderLoad.innerText = `読み込み中(${loaded}/${files.length})`
+        }
+        */
+
+        function filesDebug() {
+
+            console.log("Debug")
+            console.log(allList)
+            //console.log(allList.constructor.name)
+            //console.log(Object.keys(allList))
+            console.log(allList.length)
+            for (const data of allList) {
+                console.log(data)
+                console.log(data.path)
+                console.log(data.hash)
+                console.log(`played:${data.played}`)
+                console.log(`times:${data.times}`)
+                console.log(`weathers:${data.weather}`)
+                console.log("=====================")
+            }
+        }
+
+        filesDebug()
+
+        folderLoad.innerText = `読み込み完了(${loaded}/${files.length})`
+
+        volumeBar.disabled = false
+        modeSelect.disabled = false
+        muteCheckbox.disabled = false
+        antiPause.disabled = false
+        volumeB_Element.innerText = `music:${volumeBar.value}`
+        volumeM_Element.innerText = `bgm:${volumeBar.value}`
+    }
+
+    function changeVolume() {
+        let isPlaying = false
+        
+        let videoM_Display = window.getComputedStyle(videoM).display
+        let audioM_Display = window.getComputedStyle(audioM).display
+        let videoJ_Display = window.getComputedStyle(videoJ).display
+        let audioJ_Display = window.getComputedStyle(audioM).display
+
+        if(videoM_Display === "block" || audioM_Display === "block" || videoJ_Display === "block" || audioJ_Display === "block") {
+            isPlaying = true
+        } else {
+            isPlaying = false
+        }
+
+        let v = 0
+        let m = 0
+        let b = 0
+
+        if (muteCheckbox.checked) {
+            v = 0
+        } else {
+            v = volumeBar.value / 100
+        }
+
+        m = 1
+        
+        if (isPlaying) {
+            b=0
+        } else {
+            b=1
+        }
+
+        audioM.volume = v*m
+        videoM.volume = v*m
+        audioJ.volume = v*m
+        videoJ.volume = v*m
+        audioB.volume = v*b
+        videoB.volume = v*b
+        volumeM_Element.innerText = `music:${v*m*100}`
+        volumeB_Element.innerText = `bgm:${v*b*100}`
+    }
+
+    volumeBar.addEventListener("input",() => {
+        changeVolume()
+    })
+
+    antiPause.addEventListener("change",function() {
+        if (antiPause.checked) {
+            antiPauseBool = true
+        } else {
+            antiPauseBool = false
+        }
+    })
+
+    setInterval(function() {
+    if (antiPauseBool) {
+        const audioB_Remain = audioB.duration - audioB.currentTime
+        const audioM_Remain = audioM.duration - audioM.currentTime
+        const audioJ_Remain = audioJ.duration - audioJ.currentTime
+        const videoB_Remain = videoB.duration - videoB.currentTime
+        const videoM_Remain = videoM.duration - videoM.currentTime
+        const videoJ_Remain = videoJ.duration - videoJ.currentTime
+        
+        if (audioB.paused && audioB_Remain > 2) audioB.play();
+        if (videoB.paused && videoB_Remain > 2) videoB.play();
+        if (audioM.paused && audioM_Remain > 2) audioM.play();
+        if (videoM.paused && videoM_Remain > 2) videoM.play();
+        if (audioJ.paused && audioJ_Remain > 2) audioJ.play();
+        if (videoJ.paused && videoJ_Remain > 2) videoJ.play();
+    }
+}, 1000);
+
+    muteCheckbox.addEventListener("change",function() {
+        if (muteCheckbox.checked) {
+            changeVolume()
+            volumeBar.disabled = true
+        } else {
+            changeVolume()
+           volumeBar.disabled = false
+        }
+    })
+
+    loadFiles()
+
+    function randrange(min, max) {
+        return Math.floor(Math.random() * (max - min)) + min;
+    }
+
+    modeSelect.addEventListener("change",function() {
+
+        const mode = modeSelect.value
+        modeSelect.disabled = true
+
+        function playDailyAt(hour, minute, second, place, hash) {
+            function scheduleNext() {
+                let now = new Date();
+                const target = new Date();
+
+                target.setHours(hour);
+                target.setMinutes(minute);
+                target.setSeconds(second);
+                target.setMilliseconds(0);
+
+                let delay = target.getTime() - now.getTime();
+
+                // 今日すでにその時間を過ぎていたら翌日にする
+                if (delay < 0) {
+                    target.setDate(target.getDate() + 1);
+                    delay = target.getTime() - now.getTime();
+                }
+
+                setTimeout(() => {
+                play(place,hash)
+                scheduleNext(); // 終わったら翌日分を予約
+                }, delay);
+            }
+
+            scheduleNext();
+        }
+
+        function play(place,hash) {
+            const path = getPathFromHash(hash)
+            const file = getFileFromPath(path)
+            const url = URL.createObjectURL(file)
+            const lowerName = file.name.toLowerCase()
+
+            updateMusicPlayed(path)
+
+            if (place === "b") {
+                audioB.style.display = "none"
+                videoB.style.display = "none"
+
+                audioB.pause()
+                videoB.pause()
+
+
+                if (lowerName.endsWith('.mp3') || lowerName.endsWith('.m4a')) {
+                    audioB.src = url;
+                    audioB.style.display = 'block';
+                    audioB.play();
+                } else if (lowerName.endsWith('.webm') || lowerName.endsWith('.mkv') || lowerName.endsWith(".mp4")) {
+                    videoB.src = url;
+                    videoB.style.display = 'block';
+                    videoB.play();
+                }
+                changeVolume()
+
+
+            } else if (place === "m") {
+                audioM.style.display = "none"
+                videoM.style.display = "none"
+
+                audioM.pause()
+                videoB.pause()
+
+
+                nowPlaying.textContent = "再生中: " + file.name.replace(/\.[^/.]+$/, "");
+                document.title = file.name.replace(/\.[^/.]+$/, "")
+
+                if (lowerName.endsWith('.mp3') || lowerName.endsWith('.m4a')) {
+                    audioM.src = url;
+                    audioM.style.display = 'block';
+                    audioM.play();
+                } else if (lowerName.endsWith('.webm') || lowerName.endsWith('.mkv') || lowerName.endsWith(".mp4")) {
+                    videoM.src = url;
+                    videoM.style.display = 'block';
+                    videoM.play();
+                }
+                changeVolume()
+
+
+            } else if (place === "j") {
+                audioJ.style.display = "none"
+                videoJ.style.display = "none"
+
+                audioJ.pause()
+                videoJ.pause()
+
+
+                title.textContent = "再生中: " + file.name.replace(/\.[^/.]+$/, "");
+                document.title = file.name.replace(/\.[^/.]+$/, "")
+
+                if (lowerName.endsWith('.mp3') || lowerName.endsWith('.m4a')) {
+                    audioJ.src = url;
+                    audioJ.style.display = 'block';
+                    audioJ.play();
+                } else if (lowerName.endsWith('.webm') || lowerName.endsWith('.mkv') || lowerName.endsWith(".mp4")) {
+                    videoJ.src = url;
+                    videoJ.style.display = 'block';
+                    videoJ.play();
+                }
+                changeVolume()
+
+
+            }
+
+        }
+
+        function timeToSignal() {
+            let now = new Date()
+            const futureCurrentTimes = currentTimes.filter(date => date > now)
+
+            if (futureCurrentTimes.length === 0) {
+                return null
+            } else {
+                const nextSignalTime = futureCurrentTimes.reduce((a,b) => 
+                    a - now < b - now ? a : b
+                )
+                console.log(`timeToSignal: ${nextSignalTime}`)
+                return nextSignalTime
+            }
+        }
+
+        async function playByRandom(files) {
+            console.log("playByRandom")
+
+
+            if (files === undefined) {
+                files = allList
+            }
+            music_List = []
+
+            let maxPlayed = 0
+            let minPlayed = files[0].played
+            for (const music of files) {
+                if (music.played > maxPlayed) {
+                    maxPlayed = music.played
+                }
+                if (music.played < minPlayed) {
+                    minPlayed = music.played
+                }
+            }
+
+            //console.log(`maxPlayed: ${maxPlayed}`)
+            //console.log(`minPlayed: ${minPlayed}`)
+
+            let i = 0
+
+            for (const music of files) {
+                const loopTimes = maxPlayed+1-music.played
+                //console.log(`${music.path} - played ${music.played} times ${loopTimes}`)
+                for(let i=0; i<loopTimes; i++) {
+                    music_List.push(music)
+                }
+            }
+
+            //console.log(currentTimes)
+
+            while (true) {
+                //console.log(`playByRandom:loop ${i}`)
+                i++
+                if (i > 100) {break}
+
+                const now = new Date()
+                timeLeft = timeToSignal() - now//timeToSignal()は次の時報の時間を返す
+
+                timeLeft = timeLeft / 1000
+                //console.log(`timeLeftToSignal: ${timeLeft}`)
+
+                if (timeLeft < 130) {break}
+
+                let index = randrange(0,music_List.length)
+                console.log(music_List[index])
+
+                const duration = await getDuration(music_List[index].file)
+                console.log(duration)
+
+                if (duration < timeLeft+70) {//　60秒後に再生を開始+余裕
+                    console.log(`play ${music_List[index].path} next`)
+                    setTimeout(play,60*1000,"m",music_List[index].hash)
+                    break
+                }
+
+
+            }
+        }
+
+        function playByTimes() {
+            now = new Date()
+            const hour = now.getHours()
+            if ([0,1,2].includes(hour)) {
+                playByRandom(a_List)
+            } else if ([3,4,5].includes(hour)) {
+                playByRandom(b_List)
+            } else if ([6,7,8].includes(hour)) {
+                playByRandom(c_List)
+            } else if ([9,10,11].includes(hour)) {
+                playByRandom(d_List)
+            } else if ([12,13,14].includes(hour)) {
+                playByRandom(e_List)
+            } else if ([15,16,17].includes(hour)) {
+                playByRandom(f_List)
+            } else if ([18,19,20].includes(hour)) {
+                playByRandom(g_List)
+            } else if ([21,22,23].includes(hour)) {
+                playByRandom(h_List)
+            } 
+        }
+
+        function playByWeathers(weather) {
+            if (["Rain"].includes(weather)) {
+                playByRandom(rainList)
+            } else if (["Snow"].includes(weather)) {
+                playByRandom(snowList)
+            } else if (["Clear"].includes(weather)) {
+                playByRandom(clearList)
+            } else if (["Clouds"].includes(weather)) {
+                playByRandom(cloudsList)
+            } else if (["Thunderstorm","Drizzle","Mist","Smoke","Haze","Dust","Fog","Sand","Dust","Ash","Squall","Tornado"].includes(weather)) {
+                playByRandom(otherWeathersList)
+            }
+        }
+
+        function playB_Set() {
+            // playB
+            let now = new Date()
+            let hour = now.getHours()
+            if (hour === 0) {play("b","dc4052c4d7447adda004335f57818c331a82c40fb204e5736849881fbd9e9c33")}
+            else if (hour === 1) {play("b","f4af9efce9ef2ea960ce4a4c367dc45ac3f5df5fb41649b237f4afc73430c845")}
+            else if (hour === 2) {play("b","e8103bdd314d3f5b16815ff38b893756a7e27040c8b63350b05abac2fff862af")}
+            else if (hour === 3) {play("b","f19f6a7bf06b60b6d0463f7506bd55da438e7e60faa680a0eb3bd249c3bf5bd1")}
+            else if (hour === 4) {play("b","7677615da55562fc7ef3e2584b922f16b0ee5a6a0bbdbf03a21e33c9b77f02d9")}
+            else if (hour === 5) {play("b","9f8f043720d185cfd09b028c108efb3007bf18dc990acdd2276ebff6dfe7994d")}
+            else if (hour === 6) {play("b","bd60d5c84e535e75973887b8b3e8d3af7cd27f6c88ae1d4cc8350e39eec91c6a")}
+            else if (hour === 7) {play("b","ea43e8f121303dca5aa21bbad4561bb1dfbadb18fe8315db78fd7915f9b72682")}
+            else if (hour === 8) {play("b","5e8de014a33c12e7df499d1bee47b2f202b13a75d506e3f652d0b46a7c019996")}
+            else if (hour === 9) {play("b","b4dfab352cd78ffdb9e5a7f13dba6a5f73ed882c23258a3b8db22e2b5475d20b")}
+            else if (hour === 10) {play("b","42b95035df4de4734ef6c9f2627158fdc23cfe2eb613594801b4d5a61f1da376")}
+            else if (hour === 11) {play("b","f3c9230b1f5eeba4705f4b17fccf1ee05036f2b7a51f6946ea21227d9aa5b154")}
+            else if (hour === 12) {play("b","8a754ae9566af1dea0b216e7d3b750fc3eb95212724c59fbabef9fb2483e4cf5")}
+            else if (hour === 13) {play("b","9b2e2d0b113dbc1620999178e26285b3cc58372ee6e2ca23d9b59668c4f10903")}
+            else if (hour === 14) {play("b","d6b0de3568427ee14f5133d9076af15ac11c531768a86c1b47898d57059fc62d")}
+            else if (hour === 15) {play("b","6517b682bd19d93d7741455f2aaec44f21254519ec0375e586d527d044d1cee1")}
+            else if (hour === 16) {play("b","371440a08b32dbdc382969a43ce5387c113f7a091912a7bfc16487fcf948d8d0")}
+            else if (hour === 17) {play("b","25b9ece1b89826d775965d0bbe74562e91c56145ec7c3fd336db7cf03b09c2e0")}
+            else if (hour === 18) {play("b","be5552270ec70a9b4b37ea042e53acfbc17d7ecd97f900845f73f0bbe5a6b8ac")}
+            else if (hour === 19) {play("b","a75a0ffccee7a64376a12f0c844bf388161927fa22e49eead33042fddd744cd7")}
+            else if (hour === 20) {play("b","5e8802798f379a48d5717bdce485448445ba256128bf70514cd18c5eb0f628e0")}
+            else if (hour === 21) {play("b","d52d9ee8085b9846b8537095b68305305a3e8f7be117dba64efd0f4b1b360c4c")}
+            else if (hour === 22) {play("b","7dfb697ca8b62d1cf4ca76b0dda45714d27fa95ee5c40be2ee52813c1fbde15c")}
+            else if (hour === 23) {play("b","e75ef0ed1baaeaba359e29e689c9a8731078eb831e16ed7bd54f015ec7e18ad8")}
+
+            playDailyAt(0,0,0,"b","dc4052c4d7447adda004335f57818c331a82c40fb204e5736849881fbd9e9c33")
+            playDailyAt(1,0,0,"b","f4af9efce9ef2ea960ce4a4c367dc45ac3f5df5fb41649b237f4afc73430c845")
+            playDailyAt(2,0,0,"b","e8103bdd314d3f5b16815ff38b893756a7e27040c8b63350b05abac2fff862af")
+            playDailyAt(3,0,0,"b","f19f6a7bf06b60b6d0463f7506bd55da438e7e60faa680a0eb3bd249c3bf5bd1")
+            playDailyAt(4,0,0,"b","7677615da55562fc7ef3e2584b922f16b0ee5a6a0bbdbf03a21e33c9b77f02d9")
+            playDailyAt(5,0,0,"b","9f8f043720d185cfd09b028c108efb3007bf18dc990acdd2276ebff6dfe7994d")
+            playDailyAt(6,0,0,"b","bd60d5c84e535e75973887b8b3e8d3af7cd27f6c88ae1d4cc8350e39eec91c6a")
+            playDailyAt(7,0,0,"b","ea43e8f121303dca5aa21bbad4561bb1dfbadb18fe8315db78fd7915f9b72682")
+            playDailyAt(8,0,0,"b","5e8de014a33c12e7df499d1bee47b2f202b13a75d506e3f652d0b46a7c019996")
+            playDailyAt(9,0,0,"b","b4dfab352cd78ffdb9e5a7f13dba6a5f73ed882c23258a3b8db22e2b5475d20b")
+            playDailyAt(10,0,0,"b","42b95035df4de4734ef6c9f2627158fdc23cfe2eb613594801b4d5a61f1da376")
+            playDailyAt(11,0,0,"b","f3c9230b1f5eeba4705f4b17fccf1ee05036f2b7a51f6946ea21227d9aa5b154")
+            playDailyAt(12,0,0,"b","8a754ae9566af1dea0b216e7d3b750fc3eb95212724c59fbabef9fb2483e4cf5")
+            playDailyAt(13,0,0,"b","9b2e2d0b113dbc1620999178e26285b3cc58372ee6e2ca23d9b59668c4f10903")
+            playDailyAt(14,0,0,"b","d6b0de3568427ee14f5133d9076af15ac11c531768a86c1b47898d57059fc62d")
+            playDailyAt(15,0,0,"b","6517b682bd19d93d7741455f2aaec44f21254519ec0375e586d527d044d1cee1")
+            playDailyAt(16,0,0,"b","371440a08b32dbdc382969a43ce5387c113f7a091912a7bfc16487fcf948d8d0")
+            playDailyAt(17,0,0,"b","25b9ece1b89826d775965d0bbe74562e91c56145ec7c3fd336db7cf03b09c2e0")
+            playDailyAt(18,0,0,"b","be5552270ec70a9b4b37ea042e53acfbc17d7ecd97f900845f73f0bbe5a6b8ac")
+            playDailyAt(19,0,0,"b","a75a0ffccee7a64376a12f0c844bf388161927fa22e49eead33042fddd744cd7")
+            playDailyAt(20,0,0,"b","5e8802798f379a48d5717bdce485448445ba256128bf70514cd18c5eb0f628e0")
+            playDailyAt(21,0,0,"b","d52d9ee8085b9846b8537095b68305305a3e8f7be117dba64efd0f4b1b360c4c")
+            playDailyAt(22,0,0,"b","7dfb697ca8b62d1cf4ca76b0dda45714d27fa95ee5c40be2ee52813c1fbde15c")
+            playDailyAt(23,0,0,"b","e75ef0ed1baaeaba359e29e689c9a8731078eb831e16ed7bd54f015ec7e18ad8")
+        }
+
+        if (mode === "0") {
+            setTimes()
+            playB_Set()
+
+            videoJ.onended = audioJ.onended = () => {
+                audioJ.style.display = "none"
+                videoJ.style.display = "none"
+                antiPauseBool = false
+                changeVolume()
+
+                getWeather()
+                if (weather != lastWeather) {
+                    if (weather === undefined) {
+                        playByTimes()
+                    } else {
+                        console.log(`weather changed: ${weather}`)
+                        playByWeathers(weather)
+                    }
+                }
+                antiPauseBool = true
+            }
+
+            videoM.onended = audioM.onended = () => {
+                videoM.style.display = "none"
+                audioM.style.display = "none"
+                antiPauseBool = false
+                changeVolume()
+                playByTimes()
+                antiPauseBool = true
+            }
+
+            playByTimes()
+
+
+        } else if(mode === "1") {
+            setTimes()
+            playB_Set()
+            videoJ.onended = audioJ.onended = videoM.onended = audioM.onended = () => {
+                videoM.style.display = "none"
+                audioM.style.display = "none"
+                audioJ.style.display = "none"
+                videoJ.style.display = "none"
+                changeVolume()
+                playByTimes()
+            }
+        } else if (mode === "2") {
+            setTimes()
+            videoM.onended = audioM.onended = () => {
+                videoM.style.display = "none"
+                audioM.style.display = "none"
+                audioJ.style.display = "none"
+                videoJ.style.display = "none"
+                changeVolume()
+                playByRandom(allList)
+            }
+        } else if (mode === "3") {
+            undefined
+        }
+
+    })
+
+    /*
+
+    addTimeByHash("","")
+
+    */
+
+    
+function setTimes() {
+    addTimeByHash("night","7b1f1ce6f2aa9421b94bce3a1efc05e9c0e02a7d28a5518f2d5ed1a49eb2f0dd")
+    addTimeByHash("all","4e2bb0c16efd619fba10937a4d5ea812601660fcf9bb1774922062e05ae28a24")
+    addTimeByHash("all","e11d8b645d9221bd6b99d952e873d3ef5f4c66147236827e930328aa951f5a2e")
+    addTimeByHash("night","b26ac5875dfc85ea22d6a6f7c7a199b7d0d9fa45fab2841a06970893450bbdf9")
+    addTimeByHash("midnight","0b6676d9f3eae1188d2c997d49aeb644b0e8d47ca526351ddc877833cbec794a")
+    addTimeByHash("midnight","167625c000bf82a360c54676c36b885301dd022879e4c0ca1a9ae68ef9b3d0c9")
+    addTimeByHash("day","c3c1169c5e96677b37bbb438199993ce03c5f2cc811cafd618bc1fd0c4fa6219")
+    addTimeByHash("all","720dc970b2d5ed14c773907b9731f97879913e5fe1dbae9fcc20ba5341f0cd0d")
+    addTimeByHash("all","bce868a8a1fa6d82db13b46b628f0f5d3d2d74ce33a4d0d7ebdcebc24a400cc2")
+    addTimeByHash("night","6cca4801728d178adb630222b033c69cdba36c57c2bcd2424b743ae5345d11b7")
+    addTimeByHash("night","615014b598ef410063f56354095426f632d3ce9e826ee13e77fb8da4bac8ae8d")
+    addTimeByHash("midnight","ad8c775e066ff2d67132d13ff2ca29c235cd7545ecbf3a4d059d711b975f65bd")
+    addTimeByHash("midnight","aabec5472d88cd996d99ead854754445a41af9df7e9a7e2e39ae08731d435565")
+    addTimeByHash("midnight","3643950eea6e7b19cf74bd0fac54035fae21a48303babb5f35185ceb63e364d8")
+    addTimeByHash("night","b31710279589675062657210665f91063f18a728d47d87541ff05db1811f73f6")
+    addTimeByHash("all","840a11e2b37883b4e4e519aa13378814bb284be1428a91d4f59e204388b18d32")
+    addTimeByHash("all","e3852bebbce4745102b53b636532eed9eb49901886745672e1dd9c583772f27d")
+    addTimeByHash("night","ea63f6fcb18d4d8b6f5f93e3d59cc2b9a826787c2edb652a1e5f57b396badf2a")
+    addTimeByHash("night","fdd8fed4f51e1fc8cce66a674cb8cfb96f10a34302bf1e081a9dd8ce94f20397")
+    addTimeByHash("night","a105d361aa27273b90dfd82494f6f69f07acaf481e725dc485c20fb46bd94652")
+    addTimeByHash("day","8f0cd4634fcdee900a26f85cd0dd50c0040c78ce6dd292bc4be65a970990949f")
+    addTimeByHash("night","1633352d9713bcebae0c0b6acdfb067d09e075a2632fb540b04a4011f89d573f")
+    addTimeByHash("night","741fb2d732be51b86fcb8e7e80f9dedf490c201740092ea2b18d8052c7f579f4")
+    addTimeByHash("night","f8ef4209cd8e740aa57ff8f84d7cb649865de3cd1fce029be86ec8ff318f3a7e")
+    addTimeByHash("night","d01cd9ccd0d5c84f297bcbe4eafae5184ae9fbce590ddf7fcd20664705ca4356")
+    addTimeByHash("night","e8266c9504b75afde9e7a0181f417924ab28b299495e473bea7fa8ac534ff4c7")
+    addTimeByHash("night","6912e7994eaab9713a07d4bb882157f41f8d5948d866cb161f15d0a75df92948")
+    addTimeByHash("all","74bb3e3fe5f16b7061945ca8640ee033aa5968c6a209fc630a0379fa68d6a43e")
+    addTimeByHash("night","5f5e47cbc85ea5d3b1cc806d3861cff9edc2edce74bcc58b4a6055662745fc5b")
+    addTimeByHash("all","93c87759b2cd7d57e45d2112d72e070857b9e314fb2845471fe74065cd483b75")
+    addTimeByHash("all","168fd4ded35d592de508e67e116dbb0f05de7db4d6ff578edad7b34be882980a")
+    addTimeByHash("midnight","f2051966d7c816e0ccec469db97663a24f5aa64132a4b1dcaab9884d22b8160d")
+    addTimeByHash("night","9c064fe1e6283ef4db8e7d3cea908f3e88adcdf1f8ef9e79a0a1fa8a1c1f8950")
+    addTimeByHash("night","ad8aae6994f3653e198fbdb1490a0fe4155647ee4946b7852aa9bbde15dc7031")
+    addTimeByHash("all","4a6b86be4b0cef083e3e60e19c94200dc503bafe9d1ce8154011b022e7b47693")
+    addTimeByHash("all","25f93892a5e252dd6aa851cd08c68f2f992b2fe916ae3a66a20a48ceddc9baeb")
+    addTimeByHash("night","acca379b258cdeefc045d3adc712286d11fa2aba959f5678a3fc64ba7ba938b5")
+    addTimeByHash("day","8c9611d3cc33f9ac9d487860974fe211168ea1d0b4d6a396c16fa0e8565e23d8")
+    addTimeByHash("night","a6127191d73d10cc61b5f773443dd8c06bd0a2ba8072ad8b7e8f2a6f00142ea6")
+    addTimeByHash("night","33a9fca3dededae743c1b2525ac642743afc970c747a588da864eb6b66e63c60")
+    addTimeByHash("night","1b45dc0a1ed2b1fb382f0d569658a57a96d068806e6a5e7f0dab24a710e52d20")
+    addTimeByHash("night","1d73b471e081c60c78ce929c949616c0629a128fbcbcc2a9544482ab58e9c90b")
+    addTimeByHash("all","91dc7916ea1079c3d4be60a738358b9fb5062072cf95f0983d8229c70dde2844")
+    addTimeByHash("night","b0c511b29a55773ac2ae484dcca38e1b5810091d41918b2051e441b328e2c398")
+    addTimeByHash("night","63d6f89d082a6d069379e66522bdae4c06f6dbc7e15589161960920dfb7c1ad9")//すろーりーないと
+    addTimeByHash("night","9ba65deefa2a75c24b3eb54aa2c2369fda4eec3dcc422ea8a17dacefc98a0d65")
+    addTimeByHash("night","df6b999bd6957637c60eadd9610495faf99c25089411cb90c86dbb64a1efd979")
+    addTimeByHash("night","331587d8965c3c440f3f3391326c40d296f102bd9a546da6a5b6c80e63f1a50a")
+    addTimeByHash("night","4ac0123aea95c552eb1916134dd95f757eae88451259c50034293db06e6ff091")
+    addTimeByHash("night","57e9ab21578b62c537f659211a34837e0aee9aac696e2a1c6f5634a335b66885")
+    addTimeByHash("night","0366b709f81fb7172446e79f7bf972c214d054c6be5a9734acdbf0222ae64257")
+    addTimeByHash("night","893d2dab514a00e10a545759707b1c61c7f82f8267a7b5d0b521ade3a70c3779")
+    addTimeByHash(["e","h"],"144970ab76db5b575037b5ac4826e99c79c68c3a0b2a9be3706a140ebd23f36e")
+    addTimeByHash("midnight","6d86e70084e4cbc8f906cdf6e779c1a769588bdc215dca0207f2e5dc44a1a323")
+    addTimeByHash("night","7293412739208676b9b75e6b2e2b9acea80e4b1ee732c8ea849464068fccce20")
+    addTimeByHash("night","b41e45df1252f7132ec7e8b9347734b0e0b17cfa0b15857bc1d5f7cf8280ed5e")
+    addTimeByHash(["a","d","e","f","g","h"],"a0d57e9c8081b55f30e08acb00347e81d2392b73bec6365e6aab0fce8a6acba3")
+    addTimeByHash("night","b32f5c39941efb5efdb1bff24d948d85f5cabafcacd63477a650b973bed72356")
+    addTimeByHash(["f","g"],"44d43eb0587a5a9437eca84d84869935ee155c0648356f4ed33fc5f9e0d527e4")//MIMI - 星恋歌 ft.しょうゆ
+    addTimeByHash("all","7dbea7240555d6fe45a90024a30855a495546125515eceb82c0abe6a1b16a1dc")//MIMI - Pale
+    addTimeByHash("night","9d3eefad939a5cc4508b848894b6b95ac65d551f247f34dc9c4a728bfcd787b3")//MIMI - 夜のあいろに
+    addTimeByHash("night","e280673f580662b4c954f5745bb7194525ea2c3f01727a93a8430d9a4fcab6d2")//よるつむぎ
+    addTimeByHash("all","31695fcf87dd95222ee339620fec4a0849b9bcd79f547e44af737a7c069f5039")//MIMI - ルルージュ
+    addTimeByHash("night","3474e27a7ab73b290fe6c3fc7dab6fd62706a1fa717bf2247f3f1a94dceff5d6")//Orangestar - Surger ft.IA & 初音ミク
+    addTimeByHash("night","cd2e561e595c6948ecab4d2a8f8a206b58525761e388c231bcc97c8ee1d4ea54")//Orangestar - アスノヨゾラ哨戒班 ft.IA
+    addTimeByHash("night","8577a7640ac31c9fb1a5d2024e30b05a3e7e274d223333137eea77f6173fbef8")//MIMI - SorrowChat
+    addTimeByHash("night","b6889ded8e0d344abacf27c984a975a243eb58cb2e5f80c0ffe94594e978c1c5")//MIMI - UNFADING
+    addTimeByHash("day","8e48dd344000f4a2a83d603388510f3559c6e84b92dbb9cbe7db2dd96d3bb1df")//YOASOBI - Biri-Biri
+    addTimeByHash("night","b07d04cedf1ef988c4847c09a3e57154707ddc434b068ad9eedf5af93f10d543")//YOASOBI - HEART BEAT
+    addTimeByHash("day","6e8edc01fc5750d536ae9a27ee02c41a4b51ae8b700dbddc766683ef5a683141")//YOASOBI - PLAYERS
+    addTimeByHash("day","c0ae1b83103afa332f7ecb01476dbf1665bb1cc7a89c90e060f6da6239ec772e")//YOASOBI - UNDEAD
+    addTimeByHash(["b","c","d","e","f","g"],"6a60d3a3c58969f32a8a81effdf6fa3f985391241b45afe6a72c0cd537b53203")//YOASOBI - Watch me
+    addTimeByHash("day","50e274a3836d835d435ac806d512fd09e4d3ed99511a49306e500714505e898e")//YOASOBI - アイドル
+    addTimeByHash("day","7c056fadcce747d2228feb3f066b556ca19fc43dcfd9d942e424d88665058391")//YOASOBI - アドベンチャー
+    addTimeByHash("night","31643c843ebb410bea93672cb26c0035d5d71580dac339008ff53fdafe020a4b")//YOASOBI - あの夢をなぞって
+    addTimeByHash("night","15f05753d2d4a416657f6650ae24f9471a2f3e0ca68e91b6ba619e0e81736870")//YOASOBI - アンコール
+    addTimeByHash("notmidnight","ac0ab48f9e05debfbd3a98b4b809ec671f331b3eefde47986eb9b2336422e6a8")//YOASOBI - セブンティーン
+    addTimeByHash("all","d2faaf3a7fe22fa198a4c7b0005be8eec608c2e7f672cfea18ee68b03bc1f6ec")//YOASOBI - たぶん
+    addTimeByHash("pm","737a6bb9fd03772ea7431a0f61d60ca9c05d0111d8ae23f8e8d243a769ec2892")//YOASOBI - ハルカ
+    addTimeByHash("all","c24022f648bc8ebe3259eaaef08d02eb57b89638bbf587fc6d52d87cf4be92bf")//YOASOBI - ハルジオン
+    addTimeByHash("all","2b118c160bacd842d4bf963e579e456129cb188dd5470a9e4a36ee3534b521f4")//YOASOBI - ミスター
+    addTimeByHash("day","ca23cc6a7562e3a0ab2ef91b199a8b5d48cd0671e5dc0952e0b8a8cbe8837a59")//YOASOBI - もう少しだけ
+    addTimeByHash("night","856f643d416a7474039b8130b2f99eefe6c3b189f18aba762166650cf0b495f4")//YOASOBI - もしも命が描けたら
+    addTimeByHash("all","eb098e9438e5b2d6096a0c4793de165c872ffbb9946a9e3c9f881180555b96d3")//YOASOBI - モノトーン
+    addTimeByHash("all","58d141468f41e4250c08753695ad27bba92e6ebf833b32d97890a497470ef156")//YOASOBI - ラブレター
+    addTimeByHash("all","48cfd3e835e80d5d80792d361998c8d6f32dd748af3b37c88500e05d65d29823")//YOASOBI - 怪物
+    addTimeByHash("all","5bb245db142f1909559955953efb1cf97186ad8cb791ecd37f8bf1362b788603")//YOASOBI - 群青
+    addTimeByHash("night","875d0fb0421963289d1ad40ca9758349cb4dd3f8b474f7cf24460136bf824160")//YOASOBI - 好きだ
+    addTimeByHash("all","b9a9cbd7b1250780b686e0a0027e3f735eeadb55bc7ba1ede4de179e95b1afcb")//YOASOBI - 三原色
+    addTimeByHash("notmidnight","747f854e659d3954833068cbc2a4d9ffbda411c0f92631248da00639e340f7a6")//YOASOBI - 祝福
+    addTimeByHash("day","42f412b695ef28f9e9d52639d3fb0a96000f4f2313668f01893d144eedd42163")//YOASOBI - 大正浪漫
+    addTimeByHash("day","b952f220d7345756538cbe4877d42d52d9fd0e09f3674130a2cafc2f7b1c2d5c")//YOASOBI - 舞台に立って
+    addTimeByHash("all","1793837e637cf61b2ce548ae1066a52dbc17d0a78f2167e392450ffcd0819f3e")//YOASOBI - 夜に駆ける
+    addTimeByHash(["b","c","f","g"],"3e69f874330eebf03acc692028a7bf26418318b788d6ce2e1646cc1c2ff983da")//YOASOBI - 優しい彗星
+    addTimeByHash("all","4b7d4fac69b5b1ffbfea81f7e0794ff1ae51b8ea56f22ec62877d87d6d5d6674")//YOASOBI - 勇者
+    addTimeByHash("night","7589bd78f3a8cca54dc1d1339a82d931e070ab38d2b13c9bd252d67ef05168b2")//MIMI - ありあ
+    addTimeByHash("day","cb5f6d482bf8a69cf115edc59d51444f55f840afe932f1a01e1dc0219670c136")//吉田夜世 - オーバーライド
+    addTimeByHash("day","a7bb7d13918babc0e2919d814e4bbf3e37b2e587e5f0a1d794a120b2f6d0d504")//サツキ - オブソミート
+    addTimeByHash("night","6d313d5a7236613f18a55a3ebca31e3c07610e394191e08fb39a17612452846a")//MIMI - オマジナイ
+    addTimeByHash("all","f6e22c8446de3afadaf61678837dfeb2ab76def9d59080b45e6d6af72e0b4bff")//MIMI - カラバコにアイ
+    addTimeByHash("midnight","8096e87a8e541b9d57866e4317e888b7b4d46dd1198f2a8120f5c9206c52045e")//MIMI - サヨナラは言わないでさ
+    addTimeByHash("night","1061c816abdcb752610f317071a7a7406192198d157f1766a5da165593e358a6")//MIMI - そして夜と灯る
+    addTimeByHash("night","9998f82f8d65ee95484fb8061795fa6f1104a545c5bedba9e669ac3ba35a6ea3")//MIMI - ソルティメロウ
+    addTimeByHash("day","b2a04fbe0eeba8f973c73f7ad8698705ce0971a6e39cd01e23b100092d26a981")//柊マグネタイト
+    addTimeByHash("pm","f6417b97762f22f52428f8c4c12fbbf9bf00013df5c69bdcfbcf6f9e301e45ab")//ピノキオピー - 神っぽいな
+    addTimeByHash("night","dac45717ae80c99e0831c84f2be106025e46236bb580e07d10b64ddf372ed8cc")//フローレミ
+    addTimeByHash("all","6b03c36cefbe5cd99ac3f09d39f3496892e69e991a80999ef08566a8cad84394")//MIMI - マジック・メイド
+    addTimeByHash("night","db228ce6c48827988425d3aced71a491f73a591423751e742efffe587d117d57")//MIMI - マシュマリー
+    addTimeByHash("night","ce5cf69917d9287f344c4e62309496ba238c86be83623153f8ac6fc9f926df48")//MIMI - モーメント
+    addTimeByHash("night","085eb160defcc556ad45bb08a92df186af5b5794da07516649b2c25e33b5c0fa")//MIMI - ゆめまぼろし
+    addTimeByHash("night","14be16170b6d288fa850432ff92823fbb59bfcdf1eef3d060e849e2cee915e06")//MIMI - ラベンダー
+    addTimeByHash("night","7a7f9a415cf7b5d54c89f209679abc9b422b6e518876389f3fb4ba9c6cd3840d")//MIMI - ロココ
+    addTimeByHash("night","a9459f8fa90b15869cbf7e665284a1a9ba8079e81020b230e75fee88bd410632")//MIMI - 哀の隙間
+    addTimeByHash(["f","g"],"7cdb4de6c8804ecba9bc9afd73508d1cc45d9dd7cfa68eb1a30e03827c12d64a")//MIMI - 茜の鼓動
+    addTimeByHash("night","2c88da74ed379f8bdcf50362db82601b2ee424e4afcd7c5581fecd9c629c07d3")//MIMI - 音の灯火
+    addTimeByHash("night","9bb697408df4a5e29fa99226664e35efa2fa1b50c19905c45dff9dfeff72fbbc")//MIMI - 何もない様な
+    addTimeByHash("night","8d805934f4684c94a19d13536bcfa22d9498a3dd348db9066a0d85c3962fd6ec")//MIMI - 解答
+    addTimeByHash("day","70d6f52e54144eb29ee0af44ad544472aa8253c620cd3072f394df7164f573aa")//GODIEGO - 銀河鉄道999
+    addTimeByHash(["e","h"],"b22815f0878da4f98a7599585e609531458f0c43b4281d0707e8011d6fd65f80")//MIMI - 今はいいんだよ ft.saewool
+    addTimeByHash("night","b9ffd70d6f677fd53ef381bef77fd743b9683ba26abf421cebd4afb46e82c4f9")//MIMI - 始点前夕暮れ
+    addTimeByHash("night","96508105760e508995bdcb388fc4e519eeecd0f220120d1a9f8625b13f244018")//MIMI - 触れていたいだけ
+    addTimeByHash("night","1a0610a034d1c3051b33261daeeb434283350b5470de515e4cd56bed96724988")//MIMI - 星降るココロ
+    addTimeByHash("night","dbb91d1d390421886bdb0876276c7a1480e5446eaf5b98a36528ee2c663c1609")//MIMI - 静寂に咲く
+    addTimeByHash("night","8c57583df7a4a88540a84cfde67e3fd4d2765bd81fa1fd3d4b05889fb538cdcc")//MIMI - 頂戴な
+    addTimeByHash("night","f5ce54b0237512d7df5bcf6a18d46201210982c6fa7d174157a34a3ef85f23c1")//MIMI - 風鈴歌
+    addTimeByHash("day","15052f88022246267d6d97668ae8caefb6292e22a11548045fe20a510e999460")//カンザキイオリ - 命に嫌われている
+    addTimeByHash("night","6d11cfb530d7830c030ca37534a950f1c87eda4f58f4d79ab78073a21665cb31")//MIMI - 夜風に吹かれて口笛を
+    addTimeByHash("night","26be1462001155ba086b6c0bd58fb62bd7bc23f3559058de787b353ac10f316f")//MIMI - 夜明け前に飛び乗って
+    addTimeByHash("night","e964338c7e53269e67f4786d3fbeab35237418bc5aa27cc198706ae10e78a940")//MIMI - 恋しくなったら手を叩こう ft. 花鏡紅璃
+    addTimeByHash("night","19ddb8dc296d88051807fe03013177ba81521250244fd881329669d8a07f607c")//NINZIN - 脈拍
+    addTimeByHash("all","0756e6f0f507ba2bc1eefa7596fddfbdeacc22a1f44afb775fad4227fcc2e5c0")//NINZIN - About you
+    addTimeByHash("night","52afcb713d83fcf3eb8906b5237ce06bf9820516dce1b0fda4895a24ed7bbc41")//NINZIN - あやふや
+    addTimeByHash("all","f7d3c6ef8dd70d9e76379acf3d7603aeb64246496c71047c468706844b896fd8")//NINZIN - アルビレオ
+    addTimeByHash("all","b406dc7ca81d7fe90bab2f762ff20ae878d4d509c80c884988e94c8704eb0f7d")//NINZIN - イオ
+    addTimeByHash("all","327b671f9b4304d1e84cb83936162e3ef3fddcb2e9aa56e113652840e68c85e1")//NINZIN - スピカ
+    addTimeByHash("all","7e13a951f4d088c6735e916f5cbda67c8c4e6b5ae7ca8155bc8959feba7bc35b")//NINZIN - ただ声一つ
+    addTimeByHash(["g","h"],"17b13b379224438c17eb07f6b15b3e55c10a89430628fcfdd431fba50d318e7a")//NINZIN - ばいばいまたあした
+    addTimeByHash("day","be717ede45199979daa01ac79641ab39d9bdd49bcdd20d40d587dbbc615cfed4")//NINZIN - ブリザード
+    addTimeByHash("night","aefd5aa8cdb0411f998de4afa450d6defda112e23dc6685f3045e8a27d0efcad")//NINZIN - まちぼうけ
+    addTimeByHash("night","64f26ca7781f3cd1cedaa35f9628a31f8c1409f47f3c2d4114bf4d7b8735d3a0")//NINZIN - ユリイカ
+    addTimeByHash("night","98c74d5aec3ca7cfaa583f7df4d28f780184a1ceff9a4f2d79b26d19d264e97b")//NINZIN - リインカーネーション
+    addTimeByHash("all","cca03999b858bf345de41a7b4aaf6e8dca1717106d3c23d9717363ff8f86f1f0")//NINZIN - 愛が灯る
+    addTimeByHash("day","14828f5c1bf9a553af216e86f571595af71570447b4a8cf9c36bafc234bda9bc")//NINZIN - 雨景色
+    addTimeByHash("","")
+    
+    // addSignalByHash("","")
+    addSignalByHash("2000","5d8772c431ad1d1fb31a17f597a1a3f7e80a8474071b81518281b7dd2f1d589a")
+
+    // addWeatherByHash("","")
+    addWeatherByHash("Rain","14828f5c1bf9a553af216e86f571595af71570447b4a8cf9c36bafc234bda9bc")//NINZIN - 雨景色
+
+}
+})
+</script>

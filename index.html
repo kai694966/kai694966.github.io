@@ -5236,14 +5236,13 @@ let allStaticData =
             let least = signal[0].time - now
             let nextSignal = signal[0].time
             for (const date of signal) {
-                console.debug(date.time)
                 if (date.time - now > 0 && date.time - now < least) {
                     least = date.time - now
                     nextSignal = date.time
                     signalPath = date.path
                 }
             }
-
+            console.debug(`nextSignal:${nextSignal},play${signalPath}`)
             return {time:nextSignal,path:signalPath}
         }
     
@@ -5274,6 +5273,19 @@ let allStaticData =
         }
     
         getWeatherMusic(weather) {
+            if (weather === "Clear") {
+                playBeep("C#5")
+            } else if (weather === "Clodus") {
+                playBeep("E#5")
+            } else if (weather === "Rain") {
+                playBeep("G#5")
+            } else if (weather === "Snow") {
+                playBeep("C#6")
+            } else if (weather === "Else") {
+                playBeep("E#6")
+            }
+
+
             let result = []
             for (const data of this.cover) {
                 if (data.type === "music") {
@@ -5428,7 +5440,7 @@ let allStaticData =
     async function play(place,name) {
         const file = music.getFile(name)
         const url = URL.createObjectURL(file)
-        console.log(url)
+        console.debug(url)
         const lowerName = file.name.toLowerCase()
         if (place === "b") {
             audioB.style.display = "none"
@@ -5464,8 +5476,8 @@ let allStaticData =
             }
             changeVolume()
         } else if (place === "j") {
+            locationApi()
             const now = new Date()
-            console.log(now.getMinutes())
             if (now.getMinutes() === 0) {
                 playBeep("C6")
             } else if (now.getMinutes() === 15) {
@@ -5589,7 +5601,6 @@ let allStaticData =
         const now = new Date()
 
         const timeLeft = signal.time - now
-        console.debug(timeLeft)
         if (timeLeft == null || timeLeft == NaN) {
             console.error(`setSignal - timeLeft: ${timeLeft}ms`)
             return
@@ -5744,7 +5755,7 @@ let allStaticData =
         let musicList = []
 
         let argLength = 1
-        if (list2) {console.log(list2);argLength = 2}
+        if (list2) {argLength = 2}
 
         let maxPlayed = 0
         let minPlayed = 100000000000000000000
@@ -6063,8 +6074,8 @@ let allStaticData =
             }
         }
 
-        getWeather(apiKey)
-        getSpeed()
+        getWeather(apiKey)//場所を取得
+        getSpeed()//速度を取得
     }
 
 
@@ -6200,13 +6211,13 @@ let allStaticData =
             videoJ.style.display = "none"
             setSignal()
             changeVolume()
-            if (apiCheckbox.checked) {
+            if (apiCheckbox.checked) {//Api使用可能
                 locationApi()
                 const speed = speedE.innerText.slice(4,speedE.innerText.length-4)
 
                 console.debug(weatherAbout,speed)
 
-                if (weatherAbout != lastWeatherAbout && weatherAbout != null && lastWeatherAbout != null) {
+                if (weatherAbout != lastWeatherAbout && weatherAbout != null && lastWeatherAbout != null) {//天気が変わった時
                     changeVolume()
                     if (sceneSelectCheckbox.checked) {
                         const now = new Date()
@@ -6215,7 +6226,7 @@ let allStaticData =
                         playByRandom(music.getWeatherMusic(weatherAbout),music.getAllMusic())
                     }
 
-                } else if  (speed > 10) {
+                } else if  (speed > 10) {//天気は変わっていないが移動中の時
                     console.debug("鉄道唱歌")
                     await beepTetsudoShoka()
                     console.debug("fin")
@@ -6226,7 +6237,7 @@ let allStaticData =
                     } else {
                         playByRandom(music.getTravelMusic(),music.getAllMusic())
                     }
-                } else {
+                } else {//天気が変わっていなくて移動中でもない
                     let p = 0.1
                     if (weather === "Snow") {p = 0.5}
                     else if (weather === "Rain") {p = 0.1}
@@ -6249,6 +6260,13 @@ let allStaticData =
                         }
                     }
                 }
+            } else {//API使用不可
+                        if (sceneSelectCheckbox.checked) {
+                            const now = new Date()
+                            playByRandom(music.getMusicByTime(now.getHours()))
+                        } else {
+                            playByRandom(music.getAllMusic())
+                        }
             }
         }
 

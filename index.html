@@ -91,6 +91,8 @@ Signal On
 <p class="weather" id="sunrise">日の出:</p>
 <p class="weather" id="sunset">日の入り:</p>
 <p class="weather" id="time">取得時刻:</p>
+
+<p id="debug"></p>
 </body>
 
 <script>
@@ -135,6 +137,8 @@ Signal On
     const sunriseE = document.getElementById("sunrise")
     const sunsetE = document.getElementById("sunset")
     const timeE = document.getElementById("time")
+
+    const debugE = document.getElementById("debug")
     
     let files = undefined
 
@@ -5623,7 +5627,7 @@ let allStaticData =
             console.error(`setSignal - timeLeft: ${timeLeft}ms`)
             return
         }
-
+        console.debug(signal.path)
         setTimeout(play,timeLeft,"j",signal.path)
         setTimeout(setSignal,timeLeft+50000)//時報の0.5秒後に次の時報をセット
     }
@@ -6042,7 +6046,7 @@ function onPositionUpdate(position) {
         const kmh = (speed * 3.6).toFixed(2)
 
         speedE.innerText = `速度:${kmh}km/h`
-        alert(`${distance} / ${timeDiff} = ${kmh}`)
+        debugE.innerText = `${distance} / ${timeDiff} = ${kmh}`
         console.log(`Speed: ${kmh}km/h`)
     } else {
         speedE.innerText = "速度:計算中"
@@ -6058,6 +6062,7 @@ function onPositionUpdate(position) {
 function onPositionError(error) {
     console.error("位置情報エラー:", error)
     alert("位置情報を取得できません")
+    alert(error)
 }
 
 async function startLocationWatch() {

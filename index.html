@@ -6218,7 +6218,7 @@ let allStaticData =
             changeVolume()
             if (apiCheckbox.checked) {//Api使用可能
                 locationApi()
-                const speed = speedE.innerText.slice(3,speedE.innerText.length-4)
+                const speed = Number(speedE.innerText.slice(3,speedE.innerText.length-4))
 
                 console.debug(weatherAbout,speed)
 

@@ -5846,16 +5846,13 @@ let allStaticData =
     let weatherAbout = null
     let lastWeatherAbout = null
 
+    let lon = null
+    let lat = null
+    let lastLon = null
+    let lastLat = null
+    let lastTime = null
 
     async function locationApi() {
-
-        if (lon === undefined) {
-            let lon = null
-            let lat = null
-            let lastLon = null
-            let lastLat = null
-            let lastTime = null
-        }
 
         function openLocationDB() {
             return new Promise((resolve,reject) => {

@@ -6042,6 +6042,7 @@ function onPositionUpdate(position) {
         const kmh = (speed * 3.6).toFixed(2)
 
         speedE.innerText = `速度:${kmh}km/h`
+        alert(`${distance} / ${timeDiff} = ${kmh}`)
         console.log(`Speed: ${kmh}km/h`)
     } else {
         speedE.innerText = "速度:計算中"

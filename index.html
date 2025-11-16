@@ -39,10 +39,12 @@ Signal On
 <label for="modeSelect" >モードを選ぶ</label>
 <select id="modeSelect" name="mode" disabled="true">
     <option value="-1">選択してください</option>
-    <option value="0">下記の設定で始める</option>
+    <option value="0">下記の設定</option>
     <option value="1">Lo-fi</option>
     </option>
 </select>
+
+<button id="startButton">開始</button>
 
 <br>
 <input type="checkbox" id="bgmCheckbox" disabled="true" checked>
@@ -105,6 +107,7 @@ Signal On
     const volumeB_Element = document.getElementById("volumeB")//audio/videoBの音量を表示する
     const volumeM_Element = document.getElementById("volumeM")//audio/videoMの音量を表示する
     const modeSelect = document.getElementById("modeSelect")//モードを選ぶボタン
+    const startButton = document.getElementById("startButton")
     const audioM = document.getElementById("audioPlayerM")//audioM-element
     const videoM = document.getElementById("videoPlayerM")//videoM-element
     const audioB = document.getElementById("audioPlayerB")//audioB-element
@@ -5064,6 +5067,23 @@ let allStaticData =
 
     allStaticData = allStaticData.concat(bgmData)
 
+    const lofiData = [
+        {
+            "type":"lofi",
+            "path":"【あつ森】初期BGM 作業用BGM",
+        },
+        {
+            "type":"lofi",
+            "path":"MIMI 1AM. Study Session",
+        },
+        {
+            "type":"lofi",
+            "path":"MIMI 2AM. Study Session",
+        },
+    ]
+
+    allStaticData = allStaticData.concat(lofiData)
+
     class CoverManage {
         /*
         this.cover = [Obj(Cover),Obj(Cover)]
@@ -5262,11 +5282,10 @@ let allStaticData =
             let result = []
             for (const data of this.cover) {
                 if (data.type === "music") {
-                    for (const item of data.music) {
-                        if (item.travel) {
-                            if (music.getFile(item.path)) {result.push(item.path)}
-                        }
+                    if (data.travel) {
+                        if (music.getFile(data.path)) {result.push(data.path)}
                     }
+                    
                 }
             }
             return result
@@ -5476,7 +5495,6 @@ let allStaticData =
             }
             changeVolume()
         } else if (place === "j") {
-            locationApi()
             const now = new Date()
             if (now.getMinutes() === 0) {
                 playBeep("C6")
@@ -5789,11 +5807,9 @@ let allStaticData =
             const now = new Date()
             timeLeft = music.getNextSignal().time - now//timeToSignal()は次の時報の時間を返す
             timeLeft = timeLeft / 1000
-            console.debug(`timeLeftToSignal: ${timeLeft}`)
             if (timeLeft < 130) {break}
             let index = randrange(0,musicList.length)
             const duration = await getDuration(musicList[index])
-            console.debug(`${musicList[index]} - duration : ${duration}`)
             let nextList = undefined
             if (list2 === undefined) {
                 nextList = list
@@ -5852,7 +5868,9 @@ let allStaticData =
     let lastLat = null
     let lastTime = null
 
-    async function locationApi() {
+    let watchId = null
+    let apiKey = null
+
 
         function openLocationDB() {
             return new Promise((resolve,reject) => {
@@ -5889,162 +5907,6 @@ let allStaticData =
             })
         }
 
-        function getLocation() {
-            return new Promise((resolve,reject) => {
-                navigator.geolocation.getCurrentPosition(
-                    position => {
-                        lastLat = lat
-                        lastLon = lon
-                        lat = position.coords.latitude
-                        lon = position.coords.longitude
-                        resolve()
-                    },
-                    error => {
-                        alert("位置情報を取得できません")
-                        reject(error)
-                    }
-                )
-            })
-
-
-        }
-
-        async function getWeather(apiKey) {
-            let weather = null
-            let weatherDescription = null
-            let weatherIcon = null
-            let temp = null//セルシウス度
-            let feelTemp = null
-            let pressure = null
-            let humidity = null
-            let seaPressure = null//海抜での気圧
-            let groundPressure = null//地上での気圧
-            let visibility = null
-            let windSpeed = null
-            let windDirection = null
-            let windGust = null//最大瞬間風速
-            let clouds = null
-            let rain = null
-            let snow = null
-            let country = null
-            let sunrise = null
-            let sunset = null
-            let time = null
-            let name = null//都市名
-
-            await getLocation()
-
-            if (lat && lon) {
-                const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&lang=en&units=metric`;
-                const now = Date.now()
-
-                if (lastLat !== null && lastLon !== null && lastTime !== null) {
-                    const distance = calcDistance(lastLat,lastLon,lat,lon)
-                    const timeDiff = (now - lastTime) / 1000
-                    const speed = distance / timeDiff
-                    const kmh = (speed*3.6).toFixed(2)
-
-                    speedE.innerText = `速度:${kmh}km/h`
-                    console.log(`Speed: ${kmh}km/h`)
-                } else {
-                    speedE.innerText = "速度:計算中"
-                    console.log("速度初回取得")
-                }
-
-                lastTime = now
-
-                fetch(url)
-                    .then(response => {
-                        if (!response.ok) {
-                            alert(`HTTP Error:${response.status}`)
-                        }
-
-                        return response.json()
-                    })
-                    .then(data => {
-                        console.log("weatherApi - data")
-                        console.log(data);
-
-                        lon = data.coord.lon
-                        lat = data.coord.lat
-
-                        weather = data.weather[0].main
-                        lastWeatherAbout = weatherAbout
-                        if (weather === "Clear") {weatherAbout = "Clear"}
-                        else if (weather === "Clouds") {weatherAbout = "Clouds"}
-                        else if (weather === "Rain") {weatherAbout = "Rain"}
-                        else if (weather === "Snow") {weatherAbout = "Snow"}
-                        else {weeatherAbout = "Else"}
-                        weatherDescription = data.weather[0].description
-                        weatherIcon = data.weather[0].icon
-
-                        temp = data.main.temp
-                        feelTemp = data.main.feels_like
-                        pressure = data.main.pressure
-                        humidity = data.main.humidity
-                        seaPressure = data.main.sea_level
-                        groundPressure = data.main.grnd_level
-
-                        visibility = data.visibility
-
-                        windSpeed = data.wind.speed
-                        windDirection = data.wind.deg
-                        windGust = data.wind.gust
-
-                        clouds = data.clouds.all
-
-                        time = data.dt
-
-                        country = data.sys.country
-                        sunrise = data.sys.sunrise
-                        sunset = data.sys.sunset
-
-                        name = data.name
-
-                        rain = data.rain?.["1h"] ?? 0
-
-                        snow = data.snow?.["1h"] ?? 0
-
-
-
-                        weatherPng.src = `https://openweathermap.org/img/wn/${weatherIcon}@2x.png`
-
-                        latE.innerText = `緯度:${lat}°`
-                        lonE.innerText = `経度:${lon}°`
-
-                        weatherE.innerText = `天気:${weather} - ${weatherDescription}`
-
-                        tempE.innerText = `${temp}℃（体感:${feelTemp}℃）`
-                        pressureE.innerText = `${pressure}hPa（地上:${groundPressure}hPa,海抜:${seaPressure}hPa）`
-                        visibilityE.innerText = `可視:${visibility}m`
-
-                        windE.innerText = `風速:${windSpeed}m/s（最大瞬間風速:${windGust}m/s,方角:${windDirection}）`
-
-                        cloudsE.innerText = `雲量:${clouds}%`
-
-                        rainE.innerText = `降雨量:${rain}mm`
-                        snowE.innerText = `降雪量:${snow}mm`
-
-                        countryE.innerText = `国:${country} 都市:${name}`
-
-                        sunriseE.innerText = `日の出:${convertUnixToJST(sunrise)}`
-                        sunsetE.innerText = `日の入り:${convertUnixToJST(sunset)}`
-
-                        timeE.innerText = `取得時刻:${convertUnixToJST(time)}`
-
-
-                    })
-                    .catch(err => {
-                        alert("天気を取得できません")
-                        console.error(err);
-                    });
-
-                    apiElementManage("block")
-            } else {
-                alert("天気を取得できません")
-            }
-        }
-
         function toRad(deg) {
             return deg * Math.PI / 180
         }
@@ -6064,38 +5926,177 @@ let allStaticData =
             return R * c;
         }
 
+        function convertUnixToJST(unixTime) {
+            const date = new Date(unixTime * 1000);
 
+            return date.toLocaleString("ja-JP",{timeZone: "Asia/Tokyo"})
+        }
         
         
 
-        const locationDb = await openLocationDB()
-        apiKey = await getApiKey(locationDb)
-        if (!apiKey) {
-            apiKey = prompt("OpenWeatherのAPIキー")
-            if (apiKey) {
-                await saveApiKey(locationDb,apiKey)
-            } else {
-                alert("APIキーが入力されていません")
-                return
-            }
+    async function getWeather(latitude,longitude) {
+        if (!apiKey) {return}
+    
+        const url = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${apiKey}&lang=en&units=metric`;
+    
+    try {
+        const response = await fetch(url)
+        if (!response.ok) {
+            alert(`HTTP Error:${response.status}`)
+            return
         }
 
-        getWeather(apiKey)//場所を取得
+        const data = await response.json()
+        console.log("weatherApi - data")
+        console.log(data);
+
+        lon = data.coord.lon
+        lat = data.coord.lat
+
+        const weather = data.weather[0].main
+        lastWeatherAbout = weatherAbout
+        if (weather === "Clear") { weatherAbout = "Clear" }
+        else if (weather === "Clouds") { weatherAbout = "Clouds" }
+        else if (weather === "Rain") { weatherAbout = "Rain" }
+        else if (weather === "Snow") { weatherAbout = "Snow" }
+        else { weatherAbout = "Else" }
+
+        const weatherDescription = data.weather[0].description
+        const weatherIcon = data.weather[0].icon
+
+        const temp = data.main.temp
+        const feelTemp = data.main.feels_like
+        const pressure = data.main.pressure
+        const humidity = data.main.humidity
+        const seaPressure = data.main.sea_level
+        const groundPressure = data.main.grnd_level
+
+        const visibility = data.visibility
+
+        const windSpeed = data.wind.speed
+        const windDirection = data.wind.deg
+        const windGust = data.wind.gust
+
+        const clouds = data.clouds.all
+
+        const time = data.dt
+
+        const country = data.sys.country
+        const sunrise = data.sys.sunrise
+        const sunset = data.sys.sunset
+
+        const name = data.name
+
+        const rain = data.rain?.["1h"] ?? 0
+        const snow = data.snow?.["1h"] ?? 0
+
+        // UI更新
+        weatherPng.src = `https://openweathermap.org/img/wn/${weatherIcon}@2x.png`
+
+        latE.innerText = `緯度:${lat}°`
+        lonE.innerText = `経度:${lon}°`
+
+        weatherE.innerText = `天気:${weather} - ${weatherDescription}`
+
+        tempE.innerText = `${temp}℃（体感:${feelTemp}℃）`
+        pressureE.innerText = `${pressure}hPa（地上:${groundPressure}hPa,海抜:${seaPressure}hPa）`
+        visibilityE.innerText = `可視:${visibility}m`
+
+        windE.innerText = `風速:${windSpeed}m/s（最大瞬間風速:${windGust}m/s,方角:${windDirection}）`
+
+        cloudsE.innerText = `雲量:${clouds}%`
+
+        rainE.innerText = `降雨量:${rain}mm`
+        snowE.innerText = `降雪量:${snow}mm`
+
+        countryE.innerText = `国:${country} 都市:${name}`
+
+        sunriseE.innerText = `日の出:${convertUnixToJST(sunrise)}`
+        sunsetE.innerText = `日の入り:${convertUnixToJST(sunset)}`
+
+        timeE.innerText = `取得時刻:${convertUnixToJST(time)}`
+
+        if (typeof apiElementManage === 'function') {
+            apiElementManage("block")
+        }
+
+    } catch (err) {
+        alert("天気を取得できません")
+        console.error(err);
+    }
+}
+
+function onPositionUpdate(position) {
+    const now = Date.now()
+    
+    lastLat = lat
+    lastLon = lon
+    lat = position.coords.latitude
+    lon = position.coords.longitude
+
+    // 速度計算
+    if (lastLat !== null && lastLon !== null && lastTime !== null) {
+        const distance = calcDistance(lastLat, lastLon, lat, lon)
+        const timeDiff = (now - lastTime) / 1000
+        const speed = distance / timeDiff
+        const kmh = (speed * 3.6).toFixed(2)
+
+        speedE.innerText = `速度:${kmh}km/h`
+        console.log(`Speed: ${kmh}km/h`)
+    } else {
+        speedE.innerText = "速度:計算中"
+        console.log("速度初回取得")
     }
 
+    lastTime = now
 
-    function convertUnixToJST(unixTime) {
-        const date = new Date(unixTime * 1000);
+    // 天気情報取得
+    getWeather(lat, lon)
+}
 
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0'); // 月は0始まり
-        const day = String(date.getDate()).padStart(2, '0');
-        const hour = String(date.getHours()).padStart(2, '0');
-        const minute = String(date.getMinutes()).padStart(2, '0');
-        const second = String(date.getSeconds()).padStart(2, '0');
+function onPositionError(error) {
+    console.error("位置情報エラー:", error)
+    alert("位置情報を取得できません")
+}
 
-        return `${year}/${month}/${day} ${hour}:${minute}:${second}`;
+async function startLocationWatch() {
+    // IndexedDBからAPIキーを取得
+    const locationDb = await openLocationDB()
+    apiKey = await getApiKey(locationDb)
+    
+    if (!apiKey) {
+        apiKey = prompt("OpenWeatherのAPIキー")
+        if (apiKey) {
+            await saveApiKey(locationDb, apiKey)
+        } else {
+            alert("APIキーが入力されていません")
+            return
+        }
     }
+
+    // watchPositionで位置情報の監視を開始
+    const options = {
+        enableHighAccuracy: true,  // 高精度モード
+        timeout: 10000,            // タイムアウト10秒
+        maximumAge: 0              // キャッシュを使用しない
+    }
+
+    watchId = navigator.geolocation.watchPosition(
+        onPositionUpdate,
+        onPositionError,
+        options
+    )
+
+    console.log("位置情報の監視を開始しました")
+}
+
+function stopLocationWatch() {
+    if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId)
+        watchId = null
+        console.log("位置情報の監視を停止しました")
+    }
+}
 
 
 
@@ -6169,7 +6170,7 @@ let allStaticData =
 
     })
 
-    modeSelect.addEventListener("change",function() {
+    startButton.addEventListener("click",function() {
         modeSelect.disabled = true
         bgmCheckbox.disabled = true
         sceneSelectCheckbox.disabled = true
@@ -6203,7 +6204,7 @@ let allStaticData =
         
 
         if (apiCheckbox.checked) {
-            locationApi()
+            startLocationWatch()
         }
 
         //playBeep("C5")
@@ -6215,9 +6216,7 @@ let allStaticData =
             audioJ.style.display = "none"
             videoJ.style.display = "none"
             setSignal()
-            changeVolume()
             if (apiCheckbox.checked) {//Api使用可能
-                locationApi()
                 const speed = Number(speedE.innerText.slice(3,speedE.innerText.length-4))
 
                 console.debug(weatherAbout,speed)
@@ -6243,6 +6242,7 @@ let allStaticData =
                         playByRandom(music.getTravelMusic(),music.getAllMusic())
                     }
                 } else {//天気が変わっていなくて移動中でもない
+                    changeVolume()
                     let p = 0.1
                     if (weather === "Snow") {p = 0.5}
                     else if (weather === "Rain") {p = 0.1}
@@ -6266,12 +6266,13 @@ let allStaticData =
                     }
                 }
             } else {//API使用不可
-                        if (sceneSelectCheckbox.checked) {
-                            const now = new Date()
-                            playByRandom(music.getMusicByTime(now.getHours()))
-                        } else {
-                            playByRandom(music.getAllMusic())
-                        }
+                changeVolume()
+                if (sceneSelectCheckbox.checked) {
+                    const now = new Date()
+                    playByRandom(music.getMusicByTime(now.getHours()))
+                } else {
+                    playByRandom(music.getAllMusic())
+                }
             }
         }
 

@@ -6078,7 +6078,7 @@ async function startLocationWatch() {
     const options = {
         enableHighAccuracy: true,  // 高精度モード
         timeout: 10000,            // タイムアウト10秒
-        maximumAge: 0              // キャッシュを使用しない
+        maximumAge: 10000          // 10秒で更新
     }
 
     watchId = navigator.geolocation.watchPosition(

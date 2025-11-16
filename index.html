@@ -6057,6 +6057,7 @@ function onPositionUpdate(position) {
 
         speedE.innerText = `速度:${kmh}km/h`
         debugE.innerText = `${distance}[m] / ${timeDiff}[s] = ${kmh}`
+        document.title = `速度:${kmh}km/h`
         console.log(`Speed: ${kmh}km/h`)
     } else {
         speedE.innerText = "速度:計算中"

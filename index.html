@@ -5852,6 +5852,8 @@ let allStaticData =
         let lat = null
         let lastLon = null
         let lastLat = null
+        let lastTime = null
+        
 
         function openLocationDB() {
             return new Promise((resolve,reject) => {
@@ -5935,6 +5937,22 @@ let allStaticData =
 
             if (lat && lon) {
                 const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&lang=en&units=metric`;
+                const now = Date.now()
+
+                if (lastLat !== null && lastLon !== null && lastTime !== null) {
+                    const distance = calcDistance(lastLat,lastLon,lat,lon)
+                    const timeDiff = (now - lastTime) / 1000
+                    const speed = distance / timeDiff
+                    const kmh = (speed*3.6).toFixed(2)
+
+                    speedE.innerText = `速度:${kmh}km/h`
+                    console.log(`Speed: ${kmh}km/h`)
+                } else {
+                    speedE.innerText = "速度:計算中"
+                    console.log("速度初回取得")
+                }
+
+                lastTime = now
 
                 fetch(url)
                     .then(response => {
@@ -6047,18 +6065,7 @@ let allStaticData =
             return R * c;
         }
 
-        function getSpeed() {
-            if (lastLat !== null && lastLon !== null && lastTime !== null) {
-                const distance = calcDistance(lastLat, lastLon, lat, lon); // m
-                const timeDiff = (now - lastTime) / 1000; // 秒
-                const speed = distance / timeDiff; // m/s
-                const kmh = (speed * 3.6).toFixed(2); // km/h
 
-                if (kmh === NaN) {kmh=0}
-                speedE.innerText = `速度: ${kmh}km/h`;
-                console.log(`Speed: ${kmh} km/h`);
-            }
-        }
         
         
 
@@ -6075,7 +6082,6 @@ let allStaticData =
         }
 
         getWeather(apiKey)//場所を取得
-        getSpeed()//速度を取得
     }
 
 

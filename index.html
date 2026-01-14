@@ -147,61 +147,6 @@ Signal On
     apiElementManage("none")
 
 
-    class DB{
-        constructor(name,version,objectStore,keyPath) {
-            this.dbName = name;
-            this.dbVersion = version;
-            this.dbObjectStore = objectStore;
-            this.dbKeyPath = keyPath;
-            this.db = openDB()
-        }
-
-        openDB() {
-            return new Promise((resolve,reject) => {
-                const request = indexedDB.open(this.dbName,this.dbVersion);
-                request.onupgradeneeded = function(event) {
-                    const db = event.target.result;
-                    if (!db.objectStoreNames.contains(this.dbObjectStore)) {
-                        db.createObjectStore(this.dbObjectStore,{keyPath:this.dbKeyPath});
-                    }
-                };
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = () => resolve(request.result);
-            });
-        }
-
-        async save(key,data) {
-            return new Promise((resolve,reject) => {
-                const tx = this.db.transaction(this.dbObjectStore,"readwrite");
-                const store = tx.objectStore(this.dbObjectStore);
-                store.put({key,data});
-                tx.oncomplete = () => resolve();
-                tx.onerror = () => reject(tx.error);
-            });
-        }
-
-        async get(key) {
-            return new Promise((resolve,reject) => {
-                const tx = this.db.transaction(this.dbObjectStore,"readonly");
-                const store = tx.bojectStore(this.dbObjectStore);
-                const request = store.get(name);
-                request.onsuccess = () => {
-                    const record = request.result;
-                    if (record) {
-                        resolve(record);
-                    } else {
-                        resolve(null)
-                    }
-                }
-                request.onerror = () => reject(request.error);
-            }
-        )}
-    }
-
-
-    const filePlayedDb = new DB("FilePlayedDB",1,"played","name")
-
-
     function updateClock() {
         let time = new Date()
         let days = ["日","月","火","水","木","金","土"]
@@ -5688,9 +5633,6 @@ Signal On
     }
 
 
-
-
-
     let music = new CoverManage(allStaticData)
 
 
@@ -6013,28 +5955,14 @@ Signal On
 
         let maxPlayed = 0
         let minPlayed = 100000000000000000000
-        const now = new Date()
-        const timeLeft = (music.getNextSignal().time - now)/1000
-        if (timeLeft < 130) {return}
-
-        let ableMusicList = []
-        
         for (const path of list) {//data=path
-            const duration = await getDuration(path)
-            if (duration+70 > timeLeft) {undefined} else {
-                const played = music.getPlyed(path)
-                ableMusicList.push(
-                    {
-                        "played":played,
-                        "path":path,
-                    }
-                )
-                if (played > maxPlayed) {
-                    maxPlayed = played
-                }
-                if (played < minPlayed) {
-                    minPlayed = played
-                }
+            played = music.getPlayed(path)
+
+            if (played > maxPlayed) {
+                maxPlayed = played
+            }
+            if (played < minPlayed) {
+                minPlayed = played
             }
         }
 
@@ -6054,8 +5982,10 @@ Signal On
             //console.log(`playByRandom:loop ${i}`)
             i++
             if (i > 100) {break}
+            const now = new Date()
             timeLeft = music.getNextSignal().time - now//timeToSignal()は次の時報の時間を返す
             timeLeft = timeLeft / 1000
+            if (timeLeft < 130) {break}
             let index = randrange(0,musicList.length)
             const duration = await getDuration(musicList[index])
             let nextList = undefined

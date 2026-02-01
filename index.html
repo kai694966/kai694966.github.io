@@ -15,7 +15,7 @@ Signal On
 </head>
 <body>
 
-<p>v5.1.2.1</p>
+<p>v5.1.2.2</p>
 
 <input type="file" id="folderInput" webkitdirectory directory>
 
@@ -6308,7 +6308,14 @@ function stopLocationWatch() {
                 if (typeof result.played != "number") {
                     console.debug("result.played != num")
                 }
-                const name = file.webkitRelativePath.split("/")[file.webkitRelativePath.split("/").length-1].split(".").slice(0,-1).join(".")
+                let name = file.webkitRelativePath.split("/")[file.webkitRelativePath.split("/").length-1].split(".").slice(0,-1).join(".")
+
+                try {
+                  name = decodeURIComponent(name);
+                } catch (e) {
+                  // すでにデコードされている場合はそのまま使う
+                }
+
                 music.set(name,file)
                 music.setPlayed(name,result.played)
                 //console.debug(`${name} played ${result.played}`)
